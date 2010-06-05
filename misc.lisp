@@ -1,7 +1,7 @@
 ;;; -*- Mode: LISP; Syntax: COMMON-LISP; Package: HUNCHENTOOT; Base: 10 -*-
 ;;; $Header: /usr/local/cvsrep/hunchentoot/misc.lisp,v 1.17 2008/03/17 11:40:25 edi Exp $
 
-;;; Copyright (c) 2004-2009, Dr. Edmund Weitz. All rights reserved.
+;;; Copyright (c) 2004-2010, Dr. Edmund Weitz. All rights reserved.
 
 ;;; Redistribution and use in source and binary forms, with or without
 ;;; modification, are permitted provided that the following conditions
@@ -194,9 +194,11 @@ it'll be the content type used for all files in the folder."
                (plusp (length uri-prefix))
                (char= (char uri-prefix (1- (length uri-prefix))) #\/))
     (parameter-error "~S must be string ending with a slash." uri-prefix))
-  (when (or (pathname-name base-path)
-            (pathname-type base-path))
-    (parameter-error "~S is supposed to denote a directory." base-path))
+  (let ((name (pathname-name base-path))
+        (type (pathname-type base-path)))
+    (when (or (and name (not (eq name :unspecific)))
+              (and type (not (eq type :unspecific))))
+      (parameter-error "~S is supposed to denote a directory." base-path)))
   (flet ((handler ()
            (let* ((script-name (url-decode (script-name*)))
                   (script-path (enough-url (regex-replace-all "\\\\" script-name "/")

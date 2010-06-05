@@ -1,7 +1,7 @@
 ;;; -*- Mode: LISP; Syntax: COMMON-LISP; Package: CL-USER; Base: 10 -*-
 ;;; $Header: /usr/local/cvsrep/hunchentoot/packages.lisp,v 1.34 2008/02/13 16:02:18 edi Exp $
 
-;;; Copyright (c) 2004-2009, Dr. Edmund Weitz. All rights reserved.
+;;; Copyright (c) 2004-2010, Dr. Edmund Weitz. All rights reserved.
 
 ;;; Redistribution and use in source and binary forms, with or without
 ;;; modification, are permitted provided that the following conditions
@@ -41,6 +41,7 @@
   (:export "*ACCEPTOR*"
            "*ACCESS-LOG-PATHNAME*"
            "*APPROVED-RETURN-CODES*"
+           "*CATCH-ERRORS-P*"
            #+:lispworks
            "*CLEANUP-FUNCTION*"
            #+:lispworks
@@ -58,6 +59,7 @@
            "*LISP-ERRORS-LOG-LEVEL*"
            "*LISP-WARNINGS-LOG-LEVEL*"
            "*LISTENER*"
+           "*LOG-LISP-BACKTRACES-P*"
            "*LOG-LISP-ERRORS-P*"
            "*LOG-LISP-WARNINGS-P*"
            "*MESSAGE-LOG-PATHNAME*"
@@ -70,6 +72,7 @@
            "*SESSION-MAX-TIME*"
            "*SESSION-REMOVAL-HOOK*"
            "*SESSION-SECRET*"
+           "*SHOW-LISP-BACKTRACES-P*"
            "*SHOW-LISP-ERRORS-P*"
            "*TMP-DIRECTORY*"
            "*USE-REMOTE-ADDR-FOR-SESSIONS*"
@@ -171,6 +174,7 @@
            "GET-PARAMETERS*"
            "HANDLE-INCOMING-CONNECTION"
            "HANDLE-IF-MODIFIED-SINCE"
+           "HANDLE-REQUEST"
            "HANDLE-STATIC-FILE"
            "HEADER-IN"
            "HEADER-IN*"
@@ -186,6 +190,7 @@
            "HUNCHENTOOT-WARNING"
            "INITIALIZE-CONNECTION-STREAM"
            "LOG-MESSAGE"
+           "MAYBE-INVOKE-DEBUGGER"
            "MIME-TYPE"
            "NEXT-SESSION-ID"
            "NO-CACHE"

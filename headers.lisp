@@ -1,7 +1,7 @@
 ;;; -*- Mode: LISP; Syntax: COMMON-LISP; Package: HUNCHENTOOT; Base: 10 -*-
 ;;; $Header: /usr/local/cvsrep/hunchentoot/headers.lisp,v 1.29 2008/03/27 08:08:31 edi Exp $
 
-;;; Copyright (c) 2004-2009, Dr. Edmund Weitz.  All rights reserved.
+;;; Copyright (c) 2004-2010, Dr. Edmund Weitz.  All rights reserved.
 
 ;;; Redistribution and use in source and binary forms, with or without
 ;;; modification, are permitted provided that the following conditions
@@ -232,14 +232,17 @@ this function."
 (defun read-initial-request-line (stream)
   "Reads and returns the initial HTTP request line, catching permitted
 errors and handling *BREAK-EVEN-WHILE-READING-REQUEST-TYPE-P*.  If no
-request could be read, returns NIL."
-  (let ((*break-on-signals* (and *break-even-while-reading-request-type-p*
-                                 *break-on-signals*)))
-    (handler-case
-        (let ((*current-error-message* "While reading initial request line:"))
-          (read-line* stream))
-      ((or end-of-file #-:lispworks usocket:timeout-error) ()
-        nil))))
+request could be read, returns NIL.  At this point, both an
+end-of-file as well as a timeout condition are normal; end-of-file
+will occur when the client has decided to not send another request but
+to close the connection instead, a timeout indicates that the
+connection timeout established by Hunchentoot has expired and we do
+not want to wait for another request any longer."
+  (handler-case*
+      (let ((*current-error-message* "While reading initial request line:"))
+        (with-mapped-conditions ()
+          (read-line* stream)))
+    ((or end-of-file #-:lispworks usocket:timeout-error) ())))
   
 (defun get-request-data (stream)
   "Reads incoming headers from the client via STREAM.  Returns as

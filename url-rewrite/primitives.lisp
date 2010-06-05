@@ -1,7 +1,7 @@
 ;;; -*- Mode: LISP; Syntax: COMMON-LISP; Package: CL-USER; Base: 10 -*-
 ;;; $Header: /usr/local/cvsrep/url-rewrite/primitives.lisp,v 1.10 2007/01/01 23:55:43 edi Exp $
 
-;;; Copyright (c) 2004-2009, Dr. Edmund Weitz. All rights reserved.
+;;; Copyright (c) 2004-2010, Dr. Edmund Weitz. All rights reserved.
 
 ;;; Redistribution and use in source and binary forms, with or without
 ;;; modification, are permitted provided that the following conditions
@@ -60,7 +60,7 @@ HTML."
 
 (defun comment-start-p ()
   "Checks whether *STANDARD-OUTPUT* currently 'looks at' the string
-\"--\". Will move the position within the stream by one unless the
+\"--\".  Will move the position within the stream by one unless the
 first characters it sees is not a hyphen."
   (unless (eql (peek-char*) #\-)
     ;; if the first character isn't #\- we can return immediately
@@ -71,9 +71,9 @@ first characters it sees is not a hyphen."
 
 (defun read-while (predicate &key (skip t) (write-through t))
   "Reads characters from *STANDARD-INPUT* while PREDICATE returns a
-true value for each character. Returns the string which was read
-unless SKIP is true. Writes all characters read to *STANDARD-OUTPUT*
-if WRITE-THROUGH is true. On EOF the string read so far is returned."
+true value for each character.  Returns the string which was read
+unless SKIP is true.  Writes all characters read to *STANDARD-OUTPUT*
+if WRITE-THROUGH is true.  On EOF the string read so far is returned."
   (let ((collector (or skip
                        (make-array 0
                                    :element-type 'character
@@ -91,10 +91,10 @@ if WRITE-THROUGH is true. On EOF the string read so far is returned."
         (and (not skip) collector)))))
 
 (defun read-until (string &key (skip t) (write-through t))
-  "Reads characters from *STANDARD-INPUT* up to and including
-STRING. Return the string which was read \(excluding STRING) unless
-SKIP is true. Writes all characters read to *STANDARD-OUTPUT* if
-WRITE-THROUGH is true. On EOF the string read so far is returned."
+  "Reads characters from *STANDARD-INPUT* up to and including STRING.
+Returns the string which was read \(excluding STRING) unless SKIP is
+true.  Writes all characters read to *STANDARD-OUTPUT* if
+WRITE-THROUGH is true.  On EOF the string read so far is returned."
   (let* ((length (length string))
          (offsets
            ;; we first check whether some substring which starts

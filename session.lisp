@@ -1,7 +1,7 @@
 ;;; -*- Mode: LISP; Syntax: COMMON-LISP; Package: HUNCHENTOOT; Base: 10 -*-
 ;;; $Header: /usr/local/cvsrep/hunchentoot/session.lisp,v 1.12 2008/02/13 16:02:18 edi Exp $
 
-;;; Copyright (c) 2004-2009, Dr. Edmund Weitz.  All rights reserved.
+;;; Copyright (c) 2004-2010, Dr. Edmund Weitz.  All rights reserved.
 
 ;;; Redistribution and use in source and binary forms, with or without
 ;;; modification, are permitted provided that the following conditions
@@ -353,10 +353,10 @@ if you want to maintain your own sessions."))
 cease to be valid."
   (setq *session-secret* (create-random-string 10 36)))
 
-(defun reset-sessions ()
-  "Removes ALL stored sessions."
-  (with-session-lock-held ((session-db-lock *acceptor*))
-    (loop for (nil . session) in (session-db *acceptor*)
+(defun reset-sessions (&optional (acceptor *acceptor*))
+  "Removes ALL stored sessions of ACCEPTOR."
+  (with-session-lock-held ((session-db-lock acceptor))
+    (loop for (nil . session) in (session-db acceptor)
           do (funcall *session-removal-hook* session))
     (setq *session-db* nil))
   (values))

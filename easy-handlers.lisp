@@ -1,7 +1,7 @@
 ;;; -*- Mode: LISP; Syntax: COMMON-LISP; Package: HUNCHENTOOT; Base: 10 -*-
 ;;; $Header: /usr/local/cvsrep/hunchentoot/easy-handlers.lisp,v 1.13 2008/02/13 16:02:17 edi Exp $
 
-;;; Copyright (c) 2004-2009, Dr. Edmund Weitz.  All rights reserved.
+;;; Copyright (c) 2004-2010, Dr. Edmund Weitz.  All rights reserved.
 
 ;;; Redistribution and use in source and binary forms, with or without
 ;;; modification, are permitted provided that the following conditions
@@ -50,7 +50,7 @@ NIL unconditionally."
     (string argument)
     (character (and (= (length argument) 1)
                     (char argument 0)))
-    (integer (ignore-errors (parse-integer argument :junk-allowed t)))
+    (integer (ignore-errors* (parse-integer argument :junk-allowed t)))
     (keyword (as-keyword argument :destructivep nil))
     (boolean t)
     (otherwise (funcall type argument))))
@@ -184,7 +184,7 @@ returns a true value.
 
 ACCEPTOR-NAMES \(which is evaluated) can be a list of symbols which
 means that the handler will be returned by DISPATCH-EASY-HANDLERS in
-acceptor which have one of these names \(see ACCEPTOR-NAME).
+acceptors which have one of these names \(see ACCEPTOR-NAME).
 ACCEPTOR-NAMES can also be the symbol T which means that the handler
 will be returned by DISPATCH-EASY-HANDLERS in every acceptor.
 

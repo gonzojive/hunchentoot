@@ -1,3 +1,15 @@
+Version 1.1.0
+2010-01-08
+Architectural changes - see HANDLE-REQUEST (thanks to Andreas Fuchs and Frode Fjeld)
+Re-introduced *CATCH-ERRORS-P* and MAYBE-INVOKE-DEBUGGER
+Integration with trivial-backtrace (see *LOG-LISP-BACKTRACES-P*)
+Treat :UNSPECIFIC like NIL in pathname components (reported by Frode Fjeld)
+Fixed RESET-SESSIONS
+Prepared for LispWorks 6 (Nico de Jager)
+Fixed reading of post parameters (Peter Seibel and Stephen P. Compall)
+Fixed STOP by supplying the :READY-ONLY keyword to USOCKET:WAIT-FOR-INPUT
+Enabled SSL key passwords for Lisps other than LW (Vsevolod)
+
 Version 1.0.0
 2009-02-19
 Complete architectural redesign (together with Hans Hübner)

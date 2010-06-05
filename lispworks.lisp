@@ -1,7 +1,7 @@
 ;;; -*- Mode: LISP; Syntax: COMMON-LISP; Package: HUNCHENTOOT; Base: 10 -*-
 ;;; $Header: /usr/local/cvsrep/hunchentoot/port-lw.lisp,v 1.14 2008/04/08 14:39:18 edi Exp $
 
-;;; Copyright (c) 2004-2009, Dr. Edmund Weitz. All rights reserved.
+;;; Copyright (c) 2004-2010, Dr. Edmund Weitz. All rights reserved.
 
 ;;; Redistribution and use in source and binary forms, with or without
 ;;; modification, are permitted provided that the following conditions
@@ -90,14 +90,14 @@ notation."
 (defun make-socket-stream (socket acceptor)
   "Returns a stream for the socket SOCKET.  The ACCEPTOR argument is
 used to set the timeouts."
-  #-:lispworks5
+  #-(or :lispworks5 :lispworks6)
   (when (acceptor-write-timeout acceptor)
     (parameter-error "You need LispWorks 5 or higher for write timeouts."))
   (make-instance 'comm:socket-stream
                  :socket socket
                  :direction :io
                  :read-timeout (acceptor-read-timeout acceptor)
-                 #+:lispworks5 #+:lispworks5
+                 #+(or :lispworks5 :lispworks6) #+(or :lispworks5 :lispworks6)
                  :write-timeout (acceptor-write-timeout acceptor)
                  :element-type 'octet))
 
@@ -119,4 +119,6 @@ used to set the timeouts."
 (editor:setup-indent "defvar-unbound" 1 2 4)
 
 (editor:setup-indent "def-http-return-code" 1 2 4)
+
+(editor:setup-indent "handler-case*" 1 2 4)
 

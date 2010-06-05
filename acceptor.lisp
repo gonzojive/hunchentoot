@@ -1,7 +1,7 @@
 ;;; -*- Mode: LISP; Syntax: COMMON-LISP; Package: CL-USER; Base: 10 -*-
 ;;; $Header: /usr/local/cvsrep/hunchentoot/server.lisp,v 1.43 2008/04/09 08:17:48 edi Exp $
 
-;;; Copyright (c) 2004-2009, Dr. Edmund Weitz.  All rights reserved.
+;;; Copyright (c) 2004-2010, Dr. Edmund Weitz.  All rights reserved.
 
 ;;; Redistribution and use in source and binary forms, with or without
 ;;; modification, are permitted provided that the following conditions
@@ -114,7 +114,8 @@ requests.  This is the process started by COMM:START-UP-SERVER and no
 matter what kind of taskmaster you are using this will always be a new
 process different from the one where START was called.")
    #-:lispworks
-   (listen-socket :accessor acceptor-listen-socket
+   (listen-socket :initform nil
+                  :accessor acceptor-listen-socket
                   :documentation "The socket listening for incoming
 connections.")
    (acceptor-shutdown-p :initform nil
@@ -224,10 +225,16 @@ done in a loop until the stream has to be closed or until a connection
 timeout occurs.
 
 It is probably not a good idea to re-implement this method until you
-really, really know what you're doing, but you can for example write
-an around method specialized for your subclass of ACCEPTOR which binds
-or rebinds special variables which can then be accessed by your
-handlers."))
+really, really know what you're doing."))
+
+(defgeneric handle-request (acceptor request)
+  (:documentation "This function is called once the request has been
+read and a REQUEST object has been created.  Its job is to actually
+handle the request, i.e. to return something to the client.
+
+Might be a good place for around methods specialized for your subclass
+of ACCEPTOR which bind or rebind special variables which can then be
+accessed by your handlers."))
 
 (defgeneric acceptor-ssl-p (acceptor) 
   (:documentation "Returns a true value if ACCEPTOR uses SSL
@@ -249,6 +256,8 @@ they're using secure connections - see the SSL-ACCEPTOR class."))
   (shutdown (acceptor-taskmaster acceptor))
   #-:lispworks
   (usocket:socket-close (acceptor-listen-socket acceptor))
+  #-:lispworks
+  (setf (acceptor-listen-socket acceptor) nil)
   acceptor)
 
 (defmethod initialize-connection-stream ((acceptor acceptor) stream)
@@ -283,7 +292,8 @@ they're using secure connections - see the SSL-ACCEPTOR class."))
                   (lambda (cond)
                     (log-message *lisp-warnings-log-level*
                                  "Warning while processing connection: ~A" cond))))
-    (call-next-method)))
+    (with-mapped-conditions ()
+      (call-next-method))))
 
 (defmethod process-connection ((*acceptor* acceptor) (socket t))
   (let ((*hunchentoot-stream*
@@ -293,49 +303,49 @@ they're using secure connections - see the SSL-ACCEPTOR class."))
         ;; *CLOSE-HUNCHENTOOT-STREAM* has been set to T by the
         ;; handler, or the peer fails to send a request
         (loop
-         (let ((*close-hunchentoot-stream* t))
-           (when (acceptor-shutdown-p *acceptor*)
-             (return))
-           (multiple-value-bind (headers-in method url-string protocol)
-               (get-request-data *hunchentoot-stream*)
-             ;; check if there was a request at all
-             (unless method
-               (return))
-             ;; bind per-request special variables, then process the
-             ;; request - note that *ACCEPTOR* was bound above already
-             (let ((*reply* (make-instance (acceptor-reply-class *acceptor*)))
-                   (*session* nil)
-                   (transfer-encodings (cdr (assoc* :transfer-encoding headers-in))))
-               (when transfer-encodings
-                 (setq transfer-encodings
-                       (split "\\s*,\\*" transfer-encodings))
-                 (when (member "chunked" transfer-encodings :test #'equalp)
-                   (cond ((acceptor-input-chunking-p *acceptor*)
-                          ;; turn chunking on before we read the request body
-                          (setf *hunchentoot-stream* (make-chunked-stream *hunchentoot-stream*)
-                                (chunked-stream-input-chunking-p *hunchentoot-stream*) t))
-                         (t (hunchentoot-error "Client tried to use ~
+          (let ((*close-hunchentoot-stream* t))
+            (when (acceptor-shutdown-p *acceptor*)
+              (return))
+            (multiple-value-bind (headers-in method url-string protocol)
+                (get-request-data *hunchentoot-stream*)
+              ;; check if there was a request at all
+              (unless method
+                (return))
+              ;; bind per-request special variables, then process the
+              ;; request - note that *ACCEPTOR* was bound above already
+              (let ((*reply* (make-instance (acceptor-reply-class *acceptor*)))
+                    (*session* nil)
+                    (transfer-encodings (cdr (assoc* :transfer-encoding headers-in))))
+                (when transfer-encodings
+                  (setq transfer-encodings
+                        (split "\\s*,\\*" transfer-encodings))
+                  (when (member "chunked" transfer-encodings :test #'equalp)
+                    (cond ((acceptor-input-chunking-p *acceptor*)
+                           ;; turn chunking on before we read the request body
+                           (setf *hunchentoot-stream* (make-chunked-stream *hunchentoot-stream*)
+                                 (chunked-stream-input-chunking-p *hunchentoot-stream*) t))
+                          (t (hunchentoot-error "Client tried to use ~
 chunked encoding, but acceptor is configured to not use it.")))))
-               (multiple-value-bind (remote-addr remote-port)
-                   (get-peer-address-and-port socket)
-                 (process-request (make-instance (acceptor-request-class *acceptor*)
-                                                 :acceptor *acceptor*
-                                                 :remote-addr remote-addr
-                                                 :remote-port remote-port
-                                                 :headers-in headers-in
-                                                 :content-stream *hunchentoot-stream*
-                                                 :method method
-                                                 :uri url-string
-                                                 :server-protocol protocol))))
-             (force-output *hunchentoot-stream*)
-             (setq *hunchentoot-stream* (reset-connection-stream *acceptor* *hunchentoot-stream*))
-             (when *close-hunchentoot-stream*
-               (return)))))
+                (multiple-value-bind (remote-addr remote-port)
+                    (get-peer-address-and-port socket)
+                  (process-request (make-instance (acceptor-request-class *acceptor*)
+                                      :acceptor *acceptor*
+                                      :remote-addr remote-addr
+                                      :remote-port remote-port
+                                      :headers-in headers-in
+                                      :content-stream *hunchentoot-stream*
+                                      :method method
+                                      :uri url-string
+                                      :server-protocol protocol))))
+              (force-output *hunchentoot-stream*)
+              (setq *hunchentoot-stream* (reset-connection-stream *acceptor* *hunchentoot-stream*))
+              (when *close-hunchentoot-stream*
+                (return)))))
       (when *hunchentoot-stream*
         ;; as we are at the end of the request here, we ignore all
         ;; errors that may occur while flushing and/or closing the
         ;; stream.
-        (ignore-errors
+        (ignore-errors*
           (force-output *hunchentoot-stream*)
           (close *hunchentoot-stream* :abort t))))))
   
@@ -347,6 +357,8 @@ chunked encoding, but acceptor is configured to not use it.")))))
 
 #-:lispworks
 (defmethod start-listening ((acceptor acceptor))
+  (when (acceptor-listen-socket acceptor)
+    (hunchentoot-error "acceptor ~A is already listening" acceptor))
   (setf (acceptor-listen-socket acceptor)
         (usocket:socket-listen (or (acceptor-address acceptor)
                                    usocket:*wildcard-host*)
@@ -361,16 +373,16 @@ chunked encoding, but acceptor is configured to not use it.")))))
     (loop
      (when (acceptor-shutdown-p acceptor)
        (return))
-     (when (usocket:wait-for-input listener :timeout +new-connection-wait-time+)
-       (handler-case
-           (when-let (client-connection (usocket:socket-accept listener))
-             (set-timeouts client-connection
-                           (acceptor-read-timeout acceptor)
-                           (acceptor-write-timeout acceptor))
-             (handle-incoming-connection (acceptor-taskmaster acceptor)
-                                         client-connection))
-         ;; ignore condition
-         (usocket:connection-aborted-error ()))))))
+     (when (usocket:wait-for-input listener :ready-only t :timeout +new-connection-wait-time+)
+       (when-let (client-connection
+                  (handler-case* (usocket:socket-accept listener)                               
+                    ;; ignore condition
+                    (usocket:connection-aborted-error ())))
+         (set-timeouts client-connection
+                       (acceptor-read-timeout acceptor)
+                       (acceptor-write-timeout acceptor))
+         (handle-incoming-connection (acceptor-taskmaster acceptor)
+                                     client-connection))))))
 
 ;; LispWorks implementation
 
@@ -417,3 +429,28 @@ either return a handler or neglect by returning NIL."
         when action return (funcall action)
         finally (setf (return-code *reply*) +http-not-found+)))
 
+(defmethod handle-request ((*acceptor* acceptor) (*request* request))
+  "Standard method for request handling.  Calls the request dispatcher
+of *ACCEPTOR* to determine how the request should be handled.  Also
+sets up standard error handling which catches any errors within the
+handler."
+  (handler-bind ((error
+                  (lambda (cond)
+                    (when *log-lisp-errors-p*
+                      (log-message *lisp-errors-log-level*
+                                   "~A~:[~*~;~%~:*~A~]"
+                                   cond
+                                   (and *log-lisp-backtraces-p* (get-backtrace))))
+                    ;; if the headers were already sent, the error
+                    ;; happened within the body and we have to close
+                    ;; the stream
+                    (when *headers-sent*
+                      (setq *close-hunchentoot-stream* t))
+                    (throw 'handler-done
+                      (values nil cond))))
+                 (warning
+                  (lambda (cond)
+                    (when *log-lisp-warnings-p*
+                      (log-message *lisp-warnings-log-level* "~A" cond)))))
+    (with-debugger
+      (funcall (acceptor-request-dispatcher *acceptor*) *request*))))

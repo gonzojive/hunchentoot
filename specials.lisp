@@ -1,7 +1,7 @@
 ;;; -*- Mode: LISP; Syntax: COMMON-LISP; Package: HUNCHENTOOT; Base: 10 -*-
 ;;; $Header: /usr/local/cvsrep/hunchentoot/specials.lisp,v 1.33 2008/04/08 14:39:18 edi Exp $
 
-;;; Copyright (c) 2004-2009, Dr. Edmund Weitz. All rights reserved.
+;;; Copyright (c) 2004-2010, Dr. Edmund Weitz. All rights reserved.
 
 ;;; Redistribution and use in source and binary forms, with or without
 ;;; modification, are permitted provided that the following conditions
@@ -199,6 +199,10 @@ purposes.")
 (defvar *log-lisp-errors-p* t
   "Whether Lisp errors in request handlers should be logged.")
 
+(defvar *log-lisp-backtraces-p* t
+  "Whether Lisp backtraces should be logged.  Only has an effect if
+*LOG-LISP-ERRORS-P* is true as well.")
+
 (defvar *log-lisp-warnings-p* t
   "Whether Lisp warnings in request handlers should be logged.")
 
@@ -228,6 +232,10 @@ used by LOG-MESSAGE-TO-FILE function.")
   "A global lock to prevent concurrent access to the log file
 used by LOG-ACCESS-TO-FILE function.")
 
+(defvar *catch-errors-p* t
+  "Whether Hunchentoot should catch and log errors \(or rather invoke
+the debugger).")
+
 (defvar-unbound *acceptor*
   "The current ACCEPTOR object while in the context of a request.")
 
@@ -239,15 +247,6 @@ used by LOG-ACCESS-TO-FILE function.")
 
 (defvar-unbound *session*
   "The current session while in the context of a request, or NIL.")
-
-(defvar *break-even-while-reading-request-type-p* nil
-  "If this variable is set to true, Hunchentoot will not bind
-*BREAK-ON-SIGNALS* to NIL while reading the next request type from an
-incoming connection.  By default, Hunchentoot will not enter the
-debugger if an error occurs during the reading of the request type, as
-this will happen regularily and legitimately.  \(The incoming
-connection times out or the client closes the connection without
-initiating another request, which is permissible.)")
 
 (defconstant +implementation-link+
   #+:cmu "http://www.cons.org/cmucl/"
@@ -265,7 +264,7 @@ initiating another request, which is permissible.)")
 DEFAULT-DISPATCHER.")
 
 (defvar *easy-handler-alist* nil
-  "An alist of \(URI server-names function) lists defined by
+  "An alist of \(URI acceptor-names function) lists defined by
 DEFINE-EASY-HANDLER.")
 
 (defvar *http-error-handler* nil
@@ -322,6 +321,7 @@ from and writing to a socket stream.")
   "A global lock to prevent two threads from modifying *session-db* at
 the same time \(or NIL for Lisps which don't have threads).")
 
+#-:lispworks
 (defconstant +new-connection-wait-time+ 2
   "Time in seconds to wait for a new connection to arrive before
 performing a cleanup run.")

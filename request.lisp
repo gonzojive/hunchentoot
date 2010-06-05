@@ -1,7 +1,7 @@
 ;;; -*- Mode: LISP; Syntax: COMMON-LISP; Package: HUNCHENTOOT; Base: 10 -*-
 ;;; $Header: /usr/local/cvsrep/hunchentoot/request.lisp,v 1.35 2008/02/13 16:02:18 edi Exp $
 
-;;; Copyright (c) 2004-2009, Dr. Edmund Weitz.  All rights reserved.
+;;; Copyright (c) 2004-2010, Dr. Edmund Weitz.  All rights reserved.
 
 ;;; Redistribution and use in source and binary forms, with or without
 ;;; modification, are permitted provided that the following conditions
@@ -97,16 +97,14 @@ the REQUEST-CLASS slot of the ACCEPTOR class."))
 
 (defgeneric process-request (request)
   (:documentation "This function is called by PROCESS-CONNECTION after
-the incoming headers have been read.  It selects and calls a handler
-and sends the output of this handler to the client using START-OUTPUT.
-It also sets up simple error handling for the request handler.  Note
-that PROCESS-CONNECTION is called once per connection and loops in
-case of a persistent connection while PROCESS-REQUEST is called anew
-for each request.
+the incoming headers have been read.  It calls HANDLE-REQUEST to
+select and call a handler and sends the output of this handler to the
+client using START-OUTPUT.  Note that PROCESS-CONNECTION is called
+once per connection and loops in case of a persistent connection while
+PROCESS-REQUEST is called anew for each request.
 
-Like PROCESS-CONNECTION, this might be a good place to introduce
-around methods which bind special variables or do other interesting
-things.
+Essentially, you can view process-request as a thin wrapper around
+HANDLE-REQUEST.
 
 The return value of this function is ignored."))
 
@@ -183,7 +181,7 @@ slot values are computed in this :AFTER method."
   (declare (ignore init-args))
   (with-slots (headers-in cookies-in get-parameters script-name query-string session)
       request
-    (handler-case
+    (handler-case*
         (progn
           (let* ((uri (request-uri request))
                  (match-start (position #\? uri)))
@@ -216,49 +214,38 @@ change or replace this functionality unless you know what you're
 doing."
   (let (*tmp-files* *headers-sent*)
     (unwind-protect
-         (let* ((*request* request))
-           (multiple-value-bind (body error)
-               (catch 'handler-done
-                 (handler-bind ((error
-                                 (lambda (cond)
-                                   (when *log-lisp-errors-p*
-                                     (log-message *lisp-errors-log-level* "~A" cond))
-                                   ;; if the headers were already sent
-                                   ;; the error happens within the body
-                                   ;; and we have to close the stream
-                                   (when *headers-sent*
-                                     (setq *close-hunchentoot-stream* t))
-                                   (throw 'handler-done
-                                     (values nil cond))))
-                                (warning
-                                 (lambda (cond)
-                                   (when *log-lisp-warnings-p*
-                                     (log-message *lisp-warnings-log-level* "~A" cond)))))
-                   ;; skip dispatch if bad request
-                   (when (eql (return-code *reply*) +http-ok+)
-                     ;; now do the work
-                     (funcall (acceptor-request-dispatcher *acceptor*) *request*))))
-             (when error
-               (setf (return-code *reply*)
-                     +http-internal-server-error+))
-             (start-output :content (cond ((and error *show-lisp-errors-p*)
-                                           (format nil "<pre>~A</pre>"
-                                                   (escape-for-html (format nil "~A" error))))
-                                          (error
-                                           "An error has occured.")
-                                          (t body)))))
+        (with-mapped-conditions ()
+          (let* ((*request* request))
+            (multiple-value-bind (body error)
+                ;; skip dispatch if bad request
+                (when (eql (return-code *reply*) +http-ok+)
+                  (catch 'handler-done
+                    (handle-request *acceptor* *request*)))
+              (when error
+                (setf (return-code *reply*)
+                      +http-internal-server-error+))
+              (start-output :content (cond ((and error *show-lisp-errors-p*)
+                                            (format nil "<pre>~A</pre>"
+                                                    (escape-for-html (format nil "~A" error))))
+                                           (error
+                                            "An error has occured.")
+                                           (t body))))))
       (dolist (path *tmp-files*)
         (when (and (pathnamep path) (probe-file path))
           ;; the handler may have chosen to (re)move the uploaded
           ;; file, so ignore errors that happen during deletion
-          (ignore-errors
+          (ignore-errors*
             (delete-file path)))))))
+
+(defun within-request-p ()
+  "True if we're in the context of a request, otherwise nil."
+  (and (boundp '*request*) *request*))
 
 (defun parse-multipart-form-data (request external-format)
   "Parse the REQUEST body as multipart/form-data, assuming that its
 content type has already been verified.  Returns the form data as
 alist or NIL if there was no data or the data could not be parsed."
-  (handler-case
+  (handler-case*
       (let ((content-stream (make-flexi-stream (content-stream request) :external-format +latin-1+)))
         (prog1
             (parse-rfc2388-form-data content-stream (header-in :content-type request) external-format)
@@ -283,18 +270,20 @@ Content-Type header of the request or from
   (when (and (header-in :content-type request)
              (member (request-method request) *methods-for-post-parameters* :test #'eq)
              (or force
-                 (not (slot-value request 'raw-post-data))))
+                 (not (slot-value request 'raw-post-data)))
+	     ;; can't reparse multipart posts, even when FORCEd
+	     (not (eq t (slot-value request 'raw-post-data))))
     (unless (or (header-in :content-length request)
                 (input-chunking-p))
       (log-message :warning "Can't read request body because there's ~
 no Content-Length header and input chunking is off.")
       (return-from maybe-read-post-parameters nil))
-    (handler-case
+    (handler-case*
         (multiple-value-bind (type subtype charset)
               (parse-content-type (header-in :content-type request))
           (let ((external-format (or external-format
                                      (when charset
-                                       (handler-case
+                                       (handler-case*
                                            (make-external-format charset :eol-style :lf)
                                          (error ()
                                            (hunchentoot-warn "Ignoring ~
@@ -305,7 +294,7 @@ unknown character set ~A in request content type."
                   (cond ((and (string-equal type "application")
                               (string-equal subtype "x-www-form-urlencoded"))
                          (form-url-encoded-list-to-alist
-                          (split "&" (raw-post-data :external-format external-format)); +latin-1+))
+                          (split "&" (raw-post-data :request request :external-format +latin-1+))
                           external-format))
                         ((and (string-equal type "multipart")
                               (string-equal subtype "form-data"))
@@ -346,7 +335,13 @@ object REQUEST."
   (get-parameters request))
 
 (defmethod post-parameters :before ((request request))
-  (maybe-read-post-parameters :request request))
+  ;; Force here because if someone calls POST-PARAMETERS they actually
+  ;; want them, regardless of why the RAW-POST-DATA has been filled
+  ;; in. (For instance, if SEND-HEADERS has been called, filling in
+  ;; RAW-POST-DATA, and then subsequent code calls POST-PARAMETERS,
+  ;; without the :FORCE flag POST-PARAMETERS would return NIL.)
+  (maybe-read-post-parameters
+   :request request :force (not (slot-value request 'post-parameters))))
 
 (defun post-parameters* (&optional (request *request*))
   "Returns an alist of the POST parameters associated with the REQUEST
@@ -472,7 +467,7 @@ type was not set or if the character set specified was invalid, NIL is
 returned."
   (when content-type
     (when-let (charset (nth-value 2 (parse-content-type content-type)))
-      (handler-case
+      (handler-case*
           (make-external-format (as-keyword charset) :eol-style :lf)
         (error ()
           (hunchentoot-warn "Invalid character set ~S in request has been ignored."
