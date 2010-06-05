@@ -272,7 +272,10 @@ to be the corresponding header value as a string."
 	     (when (or (string-equal type "text")
 		       (and (string-equal type "application")
 			    (string-equal subtype "x-www-form-urlencoded")))
-	       (when charset (intern charset :keyword)))))
+               (cond
+                 ((and charset (find-symbol charset :keyword)) ;; safely intern
+                  (intern charset :keyword))
+                 (t charset)))))
        (values type subtype charset)))))
 
 (defun keep-alive-p (request)
@@ -322,3 +325,11 @@ not a chunked stream."
   "Whether the current connection to the client is secure."
   (acceptor-ssl-p acceptor))
 
+(defmacro with-mapped-conditions (() &body body)
+  "Run BODY with usocket condition mapping in effect, i.e. platform specific network errors will be
+  signalled as usocket conditions.  For Lispworks, no mapping is performed."
+  #+:lispworks
+  `(progn ,@body)
+  #-:lispworks
+  `(usocket:with-mapped-conditions ()
+    ,@body))
