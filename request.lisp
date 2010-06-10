@@ -460,19 +460,6 @@ TIME."
       (abort-request-handler))
     (values)))
 
-(defun external-format-from-content-type (content-type)
-  "Creates and returns an external format corresponding to the value
-of the content type header provided in CONTENT-TYPE.  If the content
-type was not set or if the character set specified was invalid, NIL is
-returned."
-  (when content-type
-    (when-let (charset (nth-value 2 (parse-content-type content-type)))
-      (handler-case*
-          (make-external-format (as-keyword charset) :eol-style :lf)
-        (error ()
-          (hunchentoot-warn "Invalid character set ~S in request has been ignored."
-                            charset))))))
-
 (defun raw-post-data (&key (request *request*) external-format force-text force-binary want-stream)
   "Returns the content sent by the client if there was any \(unless
 the content type was \"multipart/form-data\").  By default, the result

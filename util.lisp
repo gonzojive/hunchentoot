@@ -333,3 +333,23 @@ not a chunked stream."
   #-:lispworks
   `(usocket:with-mapped-conditions ()
     ,@body))
+
+(defun external-format-from-charset (charset)
+  "Creates and returns an external format corresponding to the
+supplied charset, which was presumably derived from a Content-Type
+header or MIME type.  If no character set is found, returns NIL."
+  (handler-case*
+   (make-external-format (as-keyword charset) :eol-style :lf)
+   (error ()
+     (hunchentoot-warn "Invalid character set ~S in request has been ignored."
+                            charset)
+     nil)))
+
+(defun external-format-from-content-type (content-type)
+  "Creates and returns an external format corresponding to the value
+of the content type header provided in CONTENT-TYPE.  If the content
+type was not set or if the character set specified was invalid, NIL is
+returned."
+  (when content-type
+    (when-let (charset (nth-value 2 (parse-content-type content-type)))
+      (external-format-from-charset charset))))
